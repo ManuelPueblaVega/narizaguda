@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detector de Nariz y Música Doria (Corregido)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        #videoContainer {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        #output, #noteOutput {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 5px;
+            border-radius: 5px;
+        }
+        #output {
+            top: 10px;
+            left: 10px;
+        }
+        #noteOutput {
+            top: 10px;
+            right: 10px;
+        }
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .note-section {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 20%;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: black;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <h1>Detector de Nariz y Música Doria (Corregido)</h1>
+    <div id="videoContainer">
+        <video id="video" width="640" height="480" autoplay></video>
+        <div id="output"></div>
+        <div id="noteOutput"></div>
+        <div id="laSection" class="note-section" style="top: 0;">La</div>
+        <div id="solSection" class="note-section" style="top: 20%;">Sol</div>
+        <div id="faSection" class="note-section" style="top: 40%;">Fa</div>
+        <div id="miSection" class="note-section" style="top: 60%;">Mi</div>
+        <div id="reSection" class="note-section" style="top: 80%;">Re</div>
+    </div>
+    <div id="status">Cargando modelo...</div>
+
+    <script>
+        const video = document.getElementById('video');
+        const output = document.getElementById('output');
+        const noteOutput = document.getElementById('noteOutput');
+        const status = document.getElementById('status');
+        const sections = ['laSection', 'solSection', 'faSection', 'miSection', 'reSection'];
+        let model, ctx, audioContext, oscillator, gainNode;
+
+        const notes = {
+            'La': 440.00,  // A4
+            'Sol': 392.00, // G4
+            'Fa': 349.23,  // F4
+            'Mi': 329.63,  // E4
+            'Re': 293.66   // D4
+        };
+
+        // Inicializar el contexto de audio
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            oscillator = audioContext.createOscillator();
+            gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.start();
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime); // Inicialmente sin sonido
+        }
+
+        // Reproducir nota
+        function playNote(frequency, noteName) {
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            gainNode.gain.setTargetAtTime(0.5, audioContext.currentTime, 0.01); // Suavizar el inicio del sonido
+            noteOutput.textContent = `Nota: ${noteName}`;
+            sections.forEach(section => {
+                document.getElementById(section).style.backgroundColor = 
+                    section === `${noteName.toLowerCase()}Section` 
+                        ? 'rgba(0, 0, 0, 0.1)' 
+                        : 'transparent';
+            });
+        }
+
+        // Detener nota
+        function stopNote() {
+            gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.01); // Suavizar el final del sonido
+            noteOutput.textContent = 'Nota: Ninguna';
+            sections.forEach(section => {
+                document.getElementById(section).style.backgroundColor = 'transparent';
+            });
+        }
+
+        // Inicializar la cámara
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => resolve(video);
+                });
+            } catch (error) {
+                status.textContent = 'Error al acceder a la cámara: ' + error.message;
+                throw error;
+            }
+        }
+
+        // Cargar el modelo
+        async function loadModel() {
+            try {
+                model = await posenet.load({
+                    architecture: 'MobileNetV1',
+                    outputStride: 16,
+                    inputResolution: { width: 640, height: 480 },
+                    multiplier: 0.75
+                });
+                status.textContent = 'Modelo cargado. Detectando nariz...';
+            } catch (error) {
+                status.textContent = 'Error al cargar el modelo: ' + error.message;
+                throw error;
+            }
+        }
+
+        // Detectar pose
+        async function detectPose() {
+            const pose = await model.estimateSinglePose(video, {
+                flipHorizontal: false
+            });
+            
+            if (pose.score > 0.2) {
+                const nose = pose.keypoints.find(point => point.part === 'nose');
+                if (nose.score > 0.5) {
+                    const y = nose.position.y;
+                    const height = video.height;
+                    const section = Math.floor((y / height) * 5);
+                    const noteName = Object.keys(notes)[section];
+                    output.textContent = `Nariz detectada en sección: ${noteName}`;
+                    playNote(notes[noteName], noteName);
+                } else {
+                    output.textContent = 'Nariz no detectada claramente';
+                    stopNote();
+                }
+            } else {
+                output.textContent = 'Pose no detectada';
+                stopNote();
+            }
+        }
+
+        // Bucle principal
+        async function runDetection() {
+            await detectPose();
+            requestAnimationFrame(runDetection);
+        }
+
+        // Inicializar la aplicación
+        async function init() {
+            await setupCamera();
+            await loadModel();
+            initAudio();
+            runDetection();
+        }
+
+        init();
+    </script>
+</body>
+</html>
