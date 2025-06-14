@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detector de Nariz y Música Doria (Corregido)</title>
+    <title>Nariz Doria</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
     <style>
@@ -16,9 +16,15 @@
             height: 100vh;
             margin: 0;
             background-color: #f0f0f0;
+            padding-bottom: 40px; /* Espacio para el footer */
         }
         h1 {
             color: #333;
+        }
+        h2 {
+            color: #555;
+            font-size: 1.2em;
+            margin-top: -10px;
         }
         #videoContainer {
             position: relative;
@@ -56,10 +62,22 @@
             font-weight: bold;
             transition: background-color 0.3s ease;
         }
+        footer {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: #e9e9e9;
+            color: #333;
+            text-align: center;
+            padding: 10px 0;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <h1>Detector de Nariz y Música Doria (Corregido)</h1>
+    <h2>Creado por Manuel Puebla Vega</h2>
     <div id="videoContainer">
         <video id="video" width="640" height="480" autoplay></video>
         <div id="output"></div>
@@ -192,5 +210,6 @@
 
         init();
     </script>
+    <footer>Todos los derechos reservados. Brotes Musicales ® 2025</footer>
 </body>
 </html>
